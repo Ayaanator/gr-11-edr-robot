@@ -7,8 +7,15 @@
 #define ARM_SPEED 20
 #define CLAW_SPEED 40
 
-const float SPEED_TO_CM_SEC = -1;
+#define TURN_SPEED 110
+#define TURN_TIME 1120
+
+const float SPEED_TO_CM_SEC = 19;
 //const float DEGREE_TO_CM
+
+#define UNIT_SPEED 41
+#define UNIT_TIME 6650
+#define UNIT_DIST 200
 
 static int driveTrainSpeed = 0;
 static int driveTrainAngle = 0;
@@ -74,6 +81,136 @@ void stopClaw()
 	motor[clawMotor] = 0;
 }
 
+void moveDistance(float distance)
+{
+	float cmPerSec = driveTrainSpeed / SPEED_TO_CM_SEC;
+	float time = distance / cmPerSec;
+	time *= 100;
+
+	moveDriveTrain();
+	wait1Msec(time);
+	stopDriveTrain();
+}
+
+void moveForward(float distance)
+{
+	int inverted = 1;
+
+	if(distance < 0)
+	{
+		distance *= -1;
+		inverted = -1;
+
+	}
+
+	float time = (distance / UNIT_DIST) * UNIT_TIME;
+
+	setDriveTrainSpeed(UNIT_SPEED * inverted);
+	moveDriveTrain();
+	wait1Msec(time);
+	stopDriveTrain();
+
+	wait1Msec(500);
+}
+
+void turnToPosition(int degrees)
+{
+
+    int angleDifference = degrees - driveTrainAngle;
+
+    // Normalize the angle difference to the shortest path within [-180, 180)
+    if (angleDifference > 180)
+    {
+        angleDifference -= 360;
+    }
+    else if (angleDifference < -180)
+    {
+        angleDifference += 360;
+    }
+
+    if (angleDifference > 0)
+    {
+        // Turn right
+        motor[leftMotor] = driveTrainSpeed;
+        motor[rightMotor] = -driveTrainSpeed;
+    }
+    else if (angleDifference < 0)
+    {
+        // Turn left
+        motor[leftMotor] = -driveTrainSpeed;
+        motor[rightMotor] = driveTrainSpeed;
+    }
+
+    float timeToTurn = (float)abs(angleDifference) / DRIVE_TRAIN_ANGLE;
+    wait1Msec(timeToTurn * 1000);
+
+    stopDriveTrain();
+    driveTrainAngle = degrees;
+}
+
+void openClaw()
+{
+	motor[clawMotor] = CLAW_SPEED;
+	wait1Msec(1000);
+	stopClaw();
+	wait1Msec(250);
+}
+
+void closeClaw()
+{
+	wait1Msec(250);
+	motor[clawMotor] = -CLAW_SPEED;
+	wait1Msec(1000);
+	stopClaw();
+	wait1Msec(250);
+}
+
+void raiseArm()
+{
+	motor[armMotor] = ARM_SPEED * 1.15;
+	wait1Msec(1150);
+	stopArm();
+}
+
+void lowerArm()
+{
+	motor[armMotor] = -ARM_SPEED;
+	wait1Msec(1800);
+	stopArm();
+}
+
+void turnRight()
+{
+	motor[leftMotor] = TURN_SPEED;
+	motor[rightMotor] = -TURN_SPEED;
+	wait1Msec(TURN_TIME / 2);
+	stopDriveTrain();
+}
+
+void turnLeft()
+{
+	motor[leftMotor] = -TURN_SPEED;
+	motor[rightMotor] = TURN_SPEED;
+	wait1Msec(TURN_TIME / 2);
+	stopDriveTrain();
+}
+
+void turnBack()
+{
+	motor[leftMotor] = TURN_SPEED;
+	motor[rightMotor] = -TURN_SPEED;
+	wait1Msec(TURN_TIME);
+	stopDriveTrain();
+}
+
+void turn(int speed, int time)
+{
+	motor[leftMotor] = speed;
+	motor[rightMotor] = -speed;
+	wait1Msec(time);
+	stopDriveTrain();
+}
+
 void initializeSystem()
 {
 	setDriveTrainSpeed(DRIVE_TRAIN_SPEED);
@@ -87,6 +224,9 @@ void initializeSystem()
 	setClawSpeed(CLAW_SPEED);
 	setClawPosition(0);
 	stopClaw();
+
+	lowerArm();
+	openClaw();
 }
 
 void resetSystem()
@@ -102,29 +242,70 @@ void resetSystem()
 	setClawSpeed(0);
 }
 
-void moveDistance(float distance)
-{
-	float cmPerSec = driveTrainSpeed / SPEED_TO_CM_SEC;
-	float time = distance / cmPerSec;
-
-	moveDriveTrain();
-	wait1Msec(time);
-	stopDriveTrain();
-}
-
-void turn(int degrees)
-{
-
-}
-
 task main()
 {
 	initializeSystem();
-	setDriveTrainSpeed(10);
 
-	/*motor[leftMotor] = driveTrainSpeed;
-	motor[rightMotor] = driveTrainSpeed;
-	wait1Msec(300);*/
+	//turnBack();
+	//raiseArm();
+
+	while (1 == 1)
+    {
+
+    		// Drivetrain move and turn control
+        motor[leftMotor] = vexRT[Ch3];
+        motor[rightMotor] = vexRT[Ch3];
+
+        if(vexRT[Ch3] == 0)
+        {
+	        motor[leftMotor] = vexRT[Ch1];
+	        motor[rightMotor] = vexRT[Ch1] * -1;
+      	}
+
+        // Arm control
+        if (vexRT[Btn5U])
+        {
+            motor[armMotor] = ARM_SPEED;
+        }
+        else if (vexRT[Btn5D])
+        {
+            motor[armMotor] = -ARM_SPEED;
+        }
+        else
+        {
+            stopArm();
+        }
+
+        // Claw control
+        if (vexRT[Btn6U])
+        {
+            motor[clawMotor] = CLAW_SPEED;
+        }
+        else if (vexRT[Btn6D])
+        {
+            motor[clawMotor] = -CLAW_SPEED;
+        }
+        else
+        {
+            stopClaw();
+        }
+
+        wait1Msec(10);
+    }
 
 	resetSystem();
 }
+
+
+/*moveForward(41);
+	turnLeft();
+	moveForward(13);
+	closeClaw();
+	raiseArm();
+	turn(TURN_SPEED, TURN_TIME * 0.95);
+	moveForward(32);
+	lowerArm();
+	openClaw();
+	moveForward(-27);
+	turnLeft();
+	moveForward(-34);*/
